@@ -52,7 +52,7 @@ abstract class TweetSet {
     * Question: Should we implment this method here, or should it remain abstract
     * and be implemented in the subclasses?
     */
-  def union(that: TweetSet): TweetSet = ???
+  def union(that: TweetSet): TweetSet
 
   /**
     * Returns the tweet from this set which has the greatest retweet count.
@@ -105,6 +105,14 @@ abstract class TweetSet {
 }
 
 class Empty extends TweetSet {
+  /**
+    * Returns a new `TweetSet` that is the union of `TweetSet`s `this` and `that`.
+    *
+    * Question: Should we implment this method here, or should it remain abstract
+    * and be implemented in the subclasses?
+    */
+  override def union(that: TweetSet): TweetSet = that
+
   def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
 
   /**
@@ -121,6 +129,24 @@ class Empty extends TweetSet {
 }
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
+
+  /**
+    * Returns a new `TweetSet` that is the union of `TweetSet`s `this` and `that`.
+    *
+    * Question: Should we implment this method here, or should it remain abstract
+    * and be implemented in the subclasses?
+    */
+  override def union(that: TweetSet): TweetSet = {
+    that match {
+      case that:NonEmpty => {
+        var unionAcc:TweetSet = this
+        that.foreach(thatTweet => unionAcc = unionAcc incl thatTweet)
+        unionAcc
+      }
+      case _:Empty => this
+    }
+  }
+
 
   def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = {
     if (p(elem)) {
