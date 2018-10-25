@@ -1,7 +1,5 @@
 package patmat
 
-import common._
-
 /**
   * Assignment 4: Huffman coding
   *
@@ -22,16 +20,17 @@ object Huffman {
     **/
   val secret: List[Bit] = List(0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1)
 
-  def makeCodeTree(left: CodeTree, right: CodeTree) =
+  def makeCodeTree(left: CodeTree, right: CodeTree): Fork =
     Fork(left, right, chars(left) ::: chars(right), weight(left) + weight(right))
 
   // Part 1: Basics
-  def weight(tree: CodeTree): Int = ??? // tree match ...
+  def weight(tree: CodeTree): Int = tree match {
+    case Fork(_, _, _, weight) => weight
+    case Leaf(_, weight) => weight
+  }
 
 
   // Part 2: Generating Huffman trees
-
-  def chars(tree: CodeTree): List[Char] = ??? // tree match ...
 
   /**
     * In this assignment, we are working with lists of characters. This function allows
@@ -67,7 +66,7 @@ object Huffman {
     * println("integer is  : "+ theInt)
     * }
     */
-  def times(chars: List[Char]): List[(Char, Int)] = ???
+  def times(chars: List[Char]): List[(Char, Int)] = chars.groupBy(char => char).mapValues(_.length).toList
 
   /**
     * Returns a list of `Leaf` nodes for a given frequency table `freqs`.
@@ -76,12 +75,17 @@ object Huffman {
     * head of the list should have the smallest weight), where the weight
     * of a leaf is the frequency of the character.
     */
-  def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] = ???
+  def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] =
+    freqs
+      .sortBy(_._2)
+      .map {
+        case (char, weight) => Leaf(char, weight)
+      }
 
   /**
     * Checks whether the list `trees` contains only one single code tree.
     */
-  def singleton(trees: List[CodeTree]): Boolean = ???
+  def singleton(trees: List[CodeTree]): Boolean = trees.size == 1
 
   /**
     * The parameter `trees` of this function is a list of code trees ordered
@@ -95,7 +99,13 @@ object Huffman {
     * If `trees` is a list of less than two elements, that list should be returned
     * unchanged.
     */
-  def combine(trees: List[CodeTree]): List[CodeTree] = ???
+  def combine(trees: List[CodeTree]): List[CodeTree] = trees match {
+    case _ if trees.size < 2 => trees
+    case (left: Leaf) :: (right: Leaf) :: remaining =>
+      val newFork = makeCodeTree(left, right)
+      (newFork :: remaining).sortBy(_.weight)
+    case _ => List()
+  }
 
   /**
     * This function will be called in the following way:
@@ -114,10 +124,11 @@ object Huffman {
     * the example invocation. Also define the return type of the `until` function.
     *  - try to find sensible parameter names for `xxx`, `yyy` and `zzz`.
     */
-  def until(xxx: ???, yyy: ???)(zzz: ???): ??? = ???
-
-
-  // Part 3: Decoding
+  def until(edgeCase: List[CodeTree] => Boolean, f: List[CodeTree] => List[CodeTree])(tree: List[CodeTree]): List[CodeTree] =
+    if (edgeCase(tree))
+      tree
+    else
+      until(edgeCase, f)(f(tree))
 
   /**
     * This function creates a code tree which is optimal to encode the text `chars`.
@@ -125,24 +136,64 @@ object Huffman {
     * The parameter `chars` is an arbitrary text. This function extracts the character
     * frequencies from that text and creates a code tree based on them.
     */
-  def createCodeTree(chars: List[Char]): CodeTree = ???
+  def createCodeTree(chars: List[Char]): CodeTree = {
+    val charFrequencies: List[(Char, Int)] = times(chars)
+    val orderedLeaves: List[Leaf] = makeOrderedLeafList(charFrequencies)
+    val singletonTree = until(singleton, combine)(orderedLeaves)
+    singletonTree.head
+  }
+
+
+  // Part 3: Decoding
+
+  /**
+    * Write a function that returns the decoded secret
+    */
+  def decodedSecret: List[Char] = decode(frenchCode, secret)
 
   /**
     * This function decodes the bit sequence `bits` using the code tree `tree` and returns
     * the resulting list of characters.
     */
-  def decode(tree: CodeTree, bits: List[Bit]): List[Char] = ???
+  def decode(tree: CodeTree, bits: List[Bit]): List[Char] = {
+    def loop(remainingTree: CodeTree, bits: List[Bit], decodedChars: List[Char]): List[Char] = remainingTree match {
+      case Leaf(char, _) =>
+        if (bits.isEmpty)
+          decodedChars :+ char
+        else
+          loop(tree, bits, decodedChars :+ char)
 
-  /**
-    * Write a function that returns the decoded secret
-    */
-  def decodedSecret: List[Char] = ???
+      case Fork(left, right, _, _) =>
+        if (bits.head == 0)
+          loop(left, bits.tail, decodedChars)
+        else
+          loop(right, bits.tail, decodedChars)
+    }
+
+    loop(tree, bits, List())
+  }
 
   /**
     * This function encodes `text` using the code tree `tree`
     * into a sequence of bits.
     */
-  def encode(tree: CodeTree)(text: List[Char]): List[Bit] = ???
+  def encode(tree: CodeTree)(text: List[Char]): List[Bit] = {
+    def encodeChar(remainingTree: CodeTree, searchChar: Char, crawledPath: List[Bit]): List[Bit] = remainingTree match {
+      case Leaf(char, _) if searchChar equals char => crawledPath
+      case Fork(left, right, charList, _) if charList contains searchChar =>
+        if (chars(left) contains searchChar)
+          encodeChar(left, searchChar, crawledPath :+ 0)
+        else
+          encodeChar(right, searchChar, crawledPath :+ 1)
+    }
+
+    text.flatMap { char => encodeChar(tree, char, List()) }
+  }
+
+  def chars(tree: CodeTree): List[Char] = tree match {
+    case Fork(_, _, chars, _) => chars
+    case Leaf(char, _) => List(char)
+  }
 
   /**
     * This function returns the bit sequence that represents the character `char` in
@@ -190,9 +241,12 @@ object Huffman {
     * present in the leaves below it. The weight of a `Fork` node is the sum of the weights of these
     * leaves.
     */
-  abstract class CodeTree
+  trait CodeTree {
+    val weight: Int
+  }
 
   case class Fork(left: CodeTree, right: CodeTree, chars: List[Char], weight: Int) extends CodeTree
 
   case class Leaf(char: Char, weight: Int) extends CodeTree
+
 }
