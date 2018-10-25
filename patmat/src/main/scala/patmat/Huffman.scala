@@ -73,7 +73,10 @@ object Huffman {
     * println("integer is  : "+ theInt)
     * }
     */
-  def times(chars: List[Char]): List[(Char, Int)] = ???
+  def times(chars: List[Char]): List[(Char, Int)] = {
+    val groups: Map[Char, List[Char]] = chars.groupBy(c => c)
+    groups.mapValues(_.length).toList
+  }
 
   /**
     * Returns a list of `Leaf` nodes for a given frequency table `freqs`.
@@ -82,7 +85,13 @@ object Huffman {
     * head of the list should have the smallest weight), where the weight
     * of a leaf is the frequency of the character.
     */
-  def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] = ???
+  def makeOrderedLeafList(freqs: List[(Char, Int)]): List[Leaf] = {
+    freqs
+      .sortBy(_._2)
+      .map {
+      case (char, weight) => Leaf(char, weight)
+    }
+  }
 
   /**
     * Checks whether the list `trees` contains only one single code tree.
