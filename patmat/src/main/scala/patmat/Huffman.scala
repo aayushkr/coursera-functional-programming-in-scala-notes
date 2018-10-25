@@ -262,3 +262,4 @@ object Huffman {
   case class Leaf(char: Char, weight: Int) extends CodeTree
 
 }
+ 
