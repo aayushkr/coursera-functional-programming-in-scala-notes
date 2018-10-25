@@ -122,6 +122,7 @@ object Huffman {
           case Fork(_, _, _, weight) => weight
         }
       }
+      case _ => List()
     }
   }
 
@@ -142,7 +143,13 @@ object Huffman {
     * the example invocation. Also define the return type of the `until` function.
     *  - try to find sensible parameter names for `xxx`, `yyy` and `zzz`.
     */
-  def until(endCondition: List[CodeTree] => Boolean, doSomething: List[CodeTree] => List[CodeTree])(trees: List[CodeTree]): List[CodeTree] = ???
+  def until(endCondition: List[CodeTree] => Boolean, doSomething: List[CodeTree] => List[CodeTree])(trees: List[CodeTree]): List[CodeTree] = {
+    def _until: List[CodeTree] => List[CodeTree] = until(endCondition, doSomething)
+    if(endCondition(trees))
+      trees
+    else _until(doSomething(trees))
+  }
+
 
   // Part 3: Decoding
 
@@ -152,24 +159,55 @@ object Huffman {
     * The parameter `chars` is an arbitrary text. This function extracts the character
     * frequencies from that text and creates a code tree based on them.
     */
-  def createCodeTree(chars: List[Char]): CodeTree = ???
-
+  def createCodeTree(chars: List[Char]): CodeTree = {
+    val charFrequencies: List[(Char, Int)] = times(chars)
+    val orderedLeaves: List[Leaf] = makeOrderedLeafList(charFrequencies)
+    val singletonTree = until(singleton, combine)(orderedLeaves)
+    singletonTree.head
+  }
   /**
     * This function decodes the bit sequence `bits` using the code tree `tree` and returns
     * the resulting list of characters.
     */
-  def decode(tree: CodeTree, bits: List[Bit]): List[Char] = ???
+  def decode(tree: CodeTree, bits: List[Bit]): List[Char] = {
+    def loop(remainingTree: CodeTree, bits: List[Bit], decodedChars: List[Char]): List[Char] = remainingTree match {
+      case Leaf(char, _) =>
+        if (bits.isEmpty)
+          decodedChars :+ char
+        else
+          loop(tree, bits, decodedChars :+ char)
+
+      case Fork(left, right, _, _) =>
+        if (bits.head == 0)
+          loop(left, bits.tail, decodedChars)
+        else
+          loop(right, bits.tail, decodedChars)
+    }
+
+    loop(tree, bits, List())
+  }
 
   /**
     * Write a function that returns the decoded secret
     */
-  def decodedSecret: List[Char] = ???
+  def decodedSecret: List[Char] = decode(frenchCode, secret)
 
   /**
     * This function encodes `text` using the code tree `tree`
     * into a sequence of bits.
     */
-  def encode(tree: CodeTree)(text: List[Char]): List[Bit] = ???
+  def encode(tree: CodeTree)(text: List[Char]): List[Bit] = {
+    def encodeChar(remainingTree: CodeTree, searchChar: Char, crawledPath: List[Bit]): List[Bit] = remainingTree match {
+      case Leaf(char, _) if searchChar equals char => crawledPath
+      case Fork(left, right, charList, _) if charList contains searchChar =>
+        if (chars(left) contains searchChar)
+          encodeChar(left, searchChar, crawledPath :+ 0)
+        else
+          encodeChar(right, searchChar, crawledPath :+ 1)
+    }
+
+    text.flatMap { char => encodeChar(tree, char, List()) }
+  }
 
   /**
     * This function returns the bit sequence that represents the character `char` in
