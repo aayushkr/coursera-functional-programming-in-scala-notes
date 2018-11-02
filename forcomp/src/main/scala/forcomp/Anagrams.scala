@@ -1,4 +1,6 @@
 package forcomp
+import scala.collection.immutable
+import scala.collection.immutable.Stream.Empty
 
 
 object Anagrams {
@@ -34,10 +36,16 @@ object Anagrams {
    *
    *  Note: you must use `groupBy` to implement this method!
    */
-  def wordOccurrences(w: Word): Occurrences = ???
+  def wordOccurrences(w: Word): Occurrences =
+    w.toLowerCase
+      .groupBy(c => c)
+      .map{case (char, result) => char -> result.length}
+      .toList
+      .sorted
 
   /** Converts a sentence into its character occurrence list. */
-  def sentenceOccurrences(s: Sentence): Occurrences = ???
+  def sentenceOccurrences(s: Sentence): Occurrences = wordOccurrences(s mkString "")
+
 
   /** The `dictionaryByOccurrences` is a `Map` from different occurrences to a sequence of all
    *  the words that have that occurrence count.
@@ -54,10 +62,18 @@ object Anagrams {
    *    List(('a', 1), ('e', 1), ('t', 1)) -> Seq("ate", "eat", "tea")
    *
    */
-  lazy val dictionaryByOccurrences: Map[Occurrences, List[Word]] = ???
+  lazy val dictionaryByOccurrences: Map[Occurrences, List[Word]] = {
+    dictionary
+      .map(word => (wordOccurrences(word), word))
+      .groupBy{case (occurances, word) => occurances}
+      .mapValues{_.unzip._2}
+  }
 
   /** Returns all the anagrams of a given word. */
-  def wordAnagrams(word: Word): List[Word] = ???
+  def wordAnagrams(word: Word): List[Word] = dictionaryByOccurrences get wordOccurrences(word) match {
+    case None => List()
+    case Some(words) => words
+  }
 
   /** Returns the list of all subsets of the occurrence list.
    *  This includes the occurrence itself, i.e. `List(('k', 1), ('o', 1))`
@@ -81,7 +97,62 @@ object Anagrams {
    *  Note that the order of the occurrence list subsets does not matter -- the subsets
    *  in the example above could have been displayed in some other order.
    */
-  def combinations(occurrences: Occurrences): List[Occurrences] = ???
+    def combinations(occurrences: Occurrences): List[Occurrences] = {
+      if (occurrences isEmpty)
+        List(List())
+      else {
+        val r: List[Occurrences] = occurrences match {
+          case List() => List(List())
+          case head :: tail => List(List()) ++ {
+            val char = head._1
+            val count = head._2
+            val tailCombinations = combinations(tail)
+            val result: List[Occurrences] = for {
+              i <- (0 to count).toList
+              rest <- tailCombinations
+            } yield (char, i) :: (rest)
+            result.map(x => x.filter(_._2 > 0))
+          }
+        }
+        r.toList
+      }
+    }
+
+//src/main/scala/forcomp/Anagrams.scala
+
+      //  List() :: (for {
+      //    (char, max) <- occurrences
+      //    count       <- 1 to max
+      //    rest        <- combinations(occurrences.filter(pair => pair._1 > char))
+      //  } yield List((char, count)) ++ rest)
+
+
+
+
+      /*
+      {
+      val bloatedList: List[(Char, Int)] = occurrences flatMap {
+        case (char, count) => (0 to count).map { num => (char, num) }
+      }
+      val bloatedListLength = bloatedList.length
+      val combinations: List[List[(Char, Int)]] = {
+        for (
+          i <- 1 to bloatedListLength
+        ) yield bloatedList
+          .combinations(i)
+          .map { x => x.filter(_._2 > 0) }
+
+      }.flatMap { x =>
+        x match {
+          case (char, int) => List(char, int)
+          case _ => x
+        }
+      }.toList
+
+      combinations
+    }
+      * */
+
 
   /** Subtracts occurrence list `y` from occurrence list `x`.
    *
@@ -93,7 +164,23 @@ object Anagrams {
    *  Note: the resulting value is an occurrence - meaning it is sorted
    *  and has no zero-entries.
    */
-  def subtract(x: Occurrences, y: Occurrences): Occurrences = ???
+  def subtract(x: Occurrences, y: Occurrences): Occurrences = {
+    //    val xSet: Set[(Char, Int)] = x.toSet
+    //    val ySet = y.toSet
+    //    val onlyX = (xSet &~ ySet).toList
+    //
+    //    val intersect = xSet intersect ySet
+
+    val X: Map[Char, Int] = x.toMap
+    val Y: Map[Char, Int] = y.toMap
+    val onlyX: Map[Char, Int] = X -- Y.keys
+    val commonChars: Set[Char] = X.keySet intersect Y.keySet
+    val XY: Map[Char, Int] = commonChars
+      .map {c => (c, X(c) - Y(c))}
+      .filter(_._2 > 0).toMap
+
+    (onlyX ++ XY).toList.sorted
+  }
 
   /** Returns a list of all anagram sentences of the given sentence.
    *
